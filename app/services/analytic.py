@@ -4,6 +4,7 @@ from app.spark.transform import (
     calculate_error_rate,
     count_requests_by_path,
     count_requests_by_status_code,
+    count_requests_by_method,
     prepare_web_logs,
 )
 
@@ -43,6 +44,54 @@ def get_web_log_analytics() -> dict:
     )
 
     return {
+        "requests_by_path": requests_by_path,
+        "requests_by_status_code": requests_by_status_code,
+        "average_response_time": average_response_time["average_response_time_ms"],
+        "error_rate": error_rate["error_rate"],
+    }
+
+REQUEST_LOGS_CSV_PATH = "data/request_logs.csv"
+
+def get_request_log_analytics() -> dict:
+    spark = get_spark_session()
+
+    raw_df = (
+        spark.read
+            .option("header", "true")
+            .csv(REQUEST_LOGS_CSV_PATH)
+    )
+
+    logs_df = prepare_web_logs(raw_df)
+
+    request_by_method = [
+        row.asDict()
+        for row in count_requests_by_method(logs_df).collect()
+    ]
+
+    requests_by_path = [
+        row.asDict()
+        for row in count_requests_by_path(logs_df).collect()
+    ]
+
+    requests_by_status_code = [
+        row.asDict()
+        for row in count_requests_by_status_code(logs_df).collect()
+    ]
+
+    average_response_time = (
+        calculate_average_response_time(logs_df)
+            .first()
+            .asDict()
+    )
+
+    error_rate = (
+        calculate_error_rate(logs_df)
+            .first()
+            .asDict()
+    )
+
+    return {
+        "request_by_method": request_by_method,
         "requests_by_path": requests_by_path,
         "requests_by_status_code": requests_by_status_code,
         "average_response_time": average_response_time["average_response_time_ms"],

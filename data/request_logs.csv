@@ -1,0 +1,6 @@
+timestamp,method,path,status_code,response_time_ms
+2026-04-26T15:38:04,GET,/analytics/request-logs,200,3635
+2026-04-26T15:38:27,GET,/,200,0
+2026-04-26T15:38:27,GET,/analytics/web-logs,200,383
+2026-04-26T15:38:28,GET,/analytics/request-logs,200,289
+2026-04-26T15:38:32,GET,/analytics/request-logs,200,269

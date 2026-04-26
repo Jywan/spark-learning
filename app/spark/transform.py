@@ -34,3 +34,10 @@ def calculate_error_rate(df: DataFrame) -> DataFrame:
             / F.count("*")
         ).alias("error_rate")
     )
+
+def count_requests_by_method(df: DataFrame) -> DataFrame:
+    return (
+        df.groupBy("method")
+            .count()
+            .orderBy(F.desc("count"))
+    )
