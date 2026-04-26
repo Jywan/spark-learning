@@ -12,5 +12,6 @@ metastore_db/
 # 데이터 파일 (선택)
 # data/
 
+# claude code는 학습 소스 검토용
 AGENTS.md
 CLAUDE.md

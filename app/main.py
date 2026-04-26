@@ -5,7 +5,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 
-from app.services.analytic import get_web_log_analytics, get_request_log_analytics
+from app.services.analytic import get_web_log_analytics, get_request_log_analytics, get_web_log_analytics_sql
 
 REQUEST_LOG_CSV_PATH = Path("data/request_logs.csv")
 REQUEST_LOG_FIELDNAMES = ["timestamp", "method", "path", "status_code", "response_time_ms"]
@@ -57,3 +57,8 @@ def read_web_log_analytics() -> dict:
 @app.get("/analytics/request-logs")
 def read_request_log_analytics() -> dict:
     return get_request_log_analytics()
+
+
+@app.get("/analytics/web-logs-sql")
+def read_web_log_analytics_sql() -> dict:
+    return get_web_log_analytics_sql()
