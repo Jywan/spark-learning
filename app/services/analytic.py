@@ -6,6 +6,8 @@ from app.spark.transform import (
     count_requests_by_status_code,
     count_requests_by_method,
     prepare_web_logs,
+    rank_paths_by_response_time,
+    moving_average_response_time,
 )
 from app.spark.transform_sql import (
     calculate_average_response_time_sql,
@@ -142,4 +144,30 @@ def get_web_log_analytics_sql() -> dict:
         "requests_by_status_code": requests_by_status_code,
         "average_response_time": average_responese_time["average_response_time_ms"],
         "error_rate": error_rate["error_rate"],
+    }
+
+def get_web_log_window_analytics() -> dict:
+    spark = get_spark_session()
+
+    raw_df = (
+        spark.read
+            .option("header", "true")
+            .csv(WEB_LOGS_CSV_PATH)
+    )
+
+    logs_df = prepare_web_logs(raw_df)
+
+    path_response_time_rank = [
+        row.asDict()
+        for row in rank_paths_by_response_time(logs_df).collect()
+    ]
+
+    moving_avg = [
+        row.asDict()
+        for row in moving_average_response_time(logs_df).collect()
+    ]
+
+    return {
+        "path_response_time_rank": path_response_time_rank,
+        "moving_average_response_time": moving_avg,
     }

@@ -1,4 +1,4 @@
-from pyspark.sql import DataFrame
+from pyspark.sql import DataFrame, Window
 from pyspark.sql import functions as F
 
 def prepare_web_logs(df: DataFrame) -> DataFrame:
@@ -40,4 +40,23 @@ def count_requests_by_method(df: DataFrame) -> DataFrame:
         df.groupBy("method")
             .count()
             .orderBy(F.desc("count"))
+    )
+
+def rank_paths_by_response_time(df: DataFrame) -> DataFrame:
+    window_spec = Window.partitionBy("path").orderBy(F.desc("response_time_ms"))
+    return (
+        df.withColumn("rank", F.rank().over(window_spec))
+        .select("path", "response_time_ms", "rank")
+        .orderBy("path", "rank")
+    )
+
+def moving_average_response_time(df: DataFrame) -> DataFrame:
+    window_spec = Window.orderBy("timestamp").rowsBetween(-2, 0)
+    return (
+        df.withColumn(
+            "moving_avg_response_time_ms",
+            F.avg("response_time_ms").over(window_spec)
+        )
+        .select("timestamp", "path", "response_time_ms", "moving_avg_response_time_ms")
+        .orderBy("timestamp")
     )

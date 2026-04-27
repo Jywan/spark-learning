@@ -5,3 +5,4 @@ timestamp,method,path,status_code,response_time_ms
 2026-04-26T15:38:28,GET,/analytics/request-logs,200,289
 2026-04-26T15:38:32,GET,/analytics/request-logs,200,269
 2026-04-26T16:30:25,GET,/analytics/web-logs-sql,200,4070
+2026-04-27T13:28:26,GET,/analytics/web-logs-window,200,4079
