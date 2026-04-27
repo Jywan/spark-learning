@@ -6,3 +6,5 @@ timestamp,method,path,status_code,response_time_ms
 2026-04-26T15:38:32,GET,/analytics/request-logs,200,269
 2026-04-26T16:30:25,GET,/analytics/web-logs-sql,200,4070
 2026-04-27T13:28:26,GET,/analytics/web-logs-window,200,4079
+2026-04-27T21:17:50,GET,/analytics/web-logs,200,4956
+2026-04-27T21:17:54,GET,/analytics/web-logs-cached,200,614

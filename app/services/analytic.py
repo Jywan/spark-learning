@@ -19,39 +19,22 @@ from app.spark.transform_sql import (
 WEB_LOGS_CSV_PATH = "data/web_logs.csv"
 
 def get_web_log_analytics() -> dict:
+    import time
+    started_at = time.perf_counter()
+
     spark = get_spark_session()
-
-    raw_df = (
-        spark.read
-            .option("header", "true")
-            .csv(WEB_LOGS_CSV_PATH)
-    )
-
+    raw_df = spark.read.option("header", True).csv(WEB_LOGS_CSV_PATH)
     logs_df = prepare_web_logs(raw_df)
 
-    requests_by_path = [
-        row.asDict()
-        for row in count_requests_by_path(logs_df).collect()
-    ]
+    requests_by_path = [row.asDict() for row in count_requests_by_path(logs_df).collect()]
+    requests_by_status_code = [row.asDict() for row in count_requests_by_status_code(logs_df).collect()]
+    average_response_time = calculate_average_response_time(logs_df).first().asDict()
+    error_rate = calculate_error_rate(logs_df).first().asDict()
 
-    requests_by_status_code = [
-        row.asDict()
-        for row in count_requests_by_status_code(logs_df).collect()
-    ]
-
-    average_response_time = (
-        calculate_average_response_time(logs_df)
-            .first()
-            .asDict()
-    )
-
-    error_rate = (
-        calculate_error_rate(logs_df)
-            .first()
-            .asDict()
-    )
+    elapsed_ms = round((time.perf_counter() - started_at) * 1000)
 
     return {
+        "elapsed_ms": elapsed_ms,
         "requests_by_path": requests_by_path,
         "requests_by_status_code": requests_by_status_code,
         "average_response_time": average_response_time["average_response_time_ms"],
@@ -170,4 +153,39 @@ def get_web_log_window_analytics() -> dict:
     return {
         "path_response_time_rank": path_response_time_rank,
         "moving_average_response_time": moving_avg,
+    }
+
+def get_web_log_analytics_cached() -> dict:
+    import time
+    started_at = time.perf_counter()
+
+    spark = get_spark_session()
+    raw_df = spark.read.option("header", "true").csv(WEB_LOGS_CSV_PATH)
+    logs_df = prepare_web_logs(raw_df)
+    logs_df.cache()
+
+    requests_by_path = [
+        row.asDict()
+        for row in count_requests_by_path(logs_df).collect()
+    ]
+
+    requests_by_status_code = [
+        row.asDict()
+        for row in count_requests_by_status_code(logs_df).collect()
+    ]
+
+    average_response_time = calculate_average_response_time(logs_df).first().asDict()
+
+    error_rate = calculate_error_rate(logs_df).first().asDict()
+
+    logs_df.unpersist()
+
+    elapsed_ms = round((time.perf_counter() - started_at) * 1000)
+
+    return {
+        "elapsed_ms": elapsed_ms,
+        "requests_by_path": requests_by_path,
+        "requests_by_status_code": requests_by_status_code,
+        "average_response_time": average_response_time["average_response_time_ms"],
+        "error_rate": error_rate["error_rate"],
     }
