@@ -8,6 +8,8 @@ from app.spark.transform import (
     prepare_web_logs,
     rank_paths_by_response_time,
     moving_average_response_time,
+    add_response_time_grade,
+    count_requests_by_grade
 )
 from app.spark.transform_sql import (
     calculate_average_response_time_sql,
@@ -188,4 +190,25 @@ def get_web_log_analytics_cached() -> dict:
         "requests_by_status_code": requests_by_status_code,
         "average_response_time": average_response_time["average_response_time_ms"],
         "error_rate": error_rate["error_rate"],
+    }
+
+def get_web_log_udf_analytics() -> dict:
+    spark = get_spark_session()
+
+    raw_df = (
+        spark.read
+            .option("header", "true")
+            .csv(WEB_LOGS_CSV_PATH)
+    )
+
+    logs_df = prepare_web_logs(raw_df)
+    graded_df = add_response_time_grade(logs_df)
+
+    requests_by_grade = [
+        row.asDict()
+        for row in count_requests_by_grade(graded_df).collect()
+    ]
+
+    return {
+        "requests_by_grade": requests_by_grade,
     }

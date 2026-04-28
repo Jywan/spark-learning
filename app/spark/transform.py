@@ -1,5 +1,6 @@
 from pyspark.sql import DataFrame, Window
 from pyspark.sql import functions as F
+from pyspark.sql.types import StringType
 
 def prepare_web_logs(df: DataFrame) -> DataFrame:
     return (
@@ -59,4 +60,24 @@ def moving_average_response_time(df: DataFrame) -> DataFrame:
         )
         .select("timestamp", "path", "response_time_ms", "moving_avg_response_time_ms")
         .orderBy("timestamp")
+    )
+
+def classify_response_time(response_time_ms):
+    if response_time_ms <= 50:
+        return "빠름"
+    elif response_time_ms <= 150:
+        return "보통"
+    else:
+        return "느림"
+    
+classify_response_time_udf = F.udf(classify_response_time, StringType())
+
+def add_response_time_grade(df: DataFrame) -> DataFrame:
+    return df.withColumn("grade", classify_response_time_udf(F.col("response_time_ms")))
+
+def count_requests_by_grade(df: DataFrame) -> DataFrame:
+    return (
+        df.groupBy("grade")
+            .count()
+            .orderBy(F.desc("count"))
     )
