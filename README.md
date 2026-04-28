@@ -26,7 +26,6 @@ spark-webapp/
     web_logs.csv          # 샘플 웹로그 데이터
     request_logs.csv      # FastAPI 실제 요청 로그 (자동 생성)
     generate_logs.py      # 더미 데이터 생성 스크립트 (10만 행)
-    generate_logs_ml.py   # ML 실험용 더미 데이터 생성 스크립트
 ```
 
 ## 실행 방법
