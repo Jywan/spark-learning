@@ -12,6 +12,7 @@ from app.services.analytic import (
     get_web_log_window_analytics, 
     get_web_log_analytics_cached,
     get_web_log_udf_analytics,
+    get_web_log_partition_analytics,
 )
 
 REQUEST_LOG_CSV_PATH = Path("data/request_logs.csv")
@@ -81,3 +82,7 @@ def read_web_log_analytics_cached() -> dict:
 @app.get("/analytics/web-logs-udf")
 def read_web_log_udf_analytics() -> dict:
     return get_web_log_udf_analytics()
+
+@app.get("/analytics/web-logs-partition")
+def read_web_log_partition_analytics() -> dict:
+    return get_web_log_partition_analytics()

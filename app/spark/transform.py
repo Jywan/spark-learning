@@ -1,4 +1,4 @@
-from pyspark.sql import DataFrame, Window
+from pyspark.sql import DataFrame, Window, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import StringType
 
@@ -80,4 +80,19 @@ def count_requests_by_grade(df: DataFrame) -> DataFrame:
         df.groupBy("grade")
             .count()
             .orderBy(F.desc("count"))
+    )
+
+def save_partitioned(df: DataFrame, output_path: str, partition_by: str) -> None:
+    (
+        df.write
+            .partitionBy(partition_by)
+            .mode("overwrite")
+            .parquet(output_path)
+    )
+
+def read_partitioned(spark: SparkSession, input_path: str, filter_col: str, filter_val) -> DataFrame:
+    return (
+        spark.read
+            .parquet(input_path)
+            .filter(F.col(filter_col) == filter_val)
     )

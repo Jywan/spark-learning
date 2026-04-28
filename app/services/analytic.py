@@ -9,7 +9,9 @@ from app.spark.transform import (
     rank_paths_by_response_time,
     moving_average_response_time,
     add_response_time_grade,
-    count_requests_by_grade
+    count_requests_by_grade,
+    save_partitioned,
+    read_partitioned,
 )
 from app.spark.transform_sql import (
     calculate_average_response_time_sql,
@@ -19,6 +21,7 @@ from app.spark.transform_sql import (
 )
 
 WEB_LOGS_CSV_PATH = "data/web_logs.csv"
+PARTITION_PATH = "data/web_logs_partitioned"
 
 def get_web_log_analytics() -> dict:
     import time
@@ -211,4 +214,28 @@ def get_web_log_udf_analytics() -> dict:
 
     return {
         "requests_by_grade": requests_by_grade,
+    }
+
+def get_web_log_partition_analytics() -> dict:
+    import time
+    spark = get_spark_session()
+
+    raw_df = spark.read.option("header", "true").csv(WEB_LOGS_CSV_PATH)
+    logs_df = prepare_web_logs(raw_df)
+
+    save_partitioned(logs_df, PARTITION_PATH, "status_code")
+
+    started_full = time.perf_counter()
+    full_df = spark.read.parquet(PARTITION_PATH)
+    full_count = full_df.count()
+    elapsed_full_ms = round((time.perf_counter() - started_full) * 1000)
+
+    started_partition = time.perf_counter()
+    partition_df = read_partitioned(spark, PARTITION_PATH, "status_code", 200)
+    partition_count = partition_df.count()
+    elapsed_partition_ms = round((time.perf_counter() - started_partition) * 1000)
+
+    return {
+        "full_read": {"count": full_count, "elapsed_ms": elapsed_full_ms},
+        "partition_read": {"status_code": 200, "count": partition_count, "elapsed_ms": elapsed_partition_ms},
     }
