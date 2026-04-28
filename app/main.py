@@ -15,6 +15,7 @@ from app.services.analytic import (
     get_web_log_partition_analytics,
     get_web_log_kmeans_analytics,
     get_web_log_lr_analytics,
+    get_web_log_lr_improved_analytics,
 )
 
 REQUEST_LOG_CSV_PATH = Path("data/request_logs.csv")
@@ -101,3 +102,7 @@ def read_web_log_kmeans_analytics() -> dict:
 @app.get("/analytics/web-logs-lr")
 def read_web_log_lr_analytics() -> dict:
     return get_web_log_lr_analytics()
+
+@app.get("/analytics/web-logs-lr-improved")
+def read_web_log_lr_improved_analytics() -> dict:
+    return get_web_log_lr_improved_analytics()

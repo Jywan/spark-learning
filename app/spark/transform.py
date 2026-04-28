@@ -184,3 +184,64 @@ def run_logistic_regression(df: DataFrame) -> dict:
         "auc": round(auc, 4),
         "samples": samples,
     }
+
+def run_logistic_regression_improved(df: DataFrame) -> dict:
+    df_labeled = prepare_classification_features(df)
+
+    # 오분류 개선작업 - 시간대별 패턴을 반영하기 위해 'hour' 피처 추가
+    df_with_hour = df_labeled.withColumn("hour", F.hour("timestamp"))
+
+    train_df, test_df = df_with_hour.randomSplit([0.8, 0.2], seed=42)
+
+    indexer = StringIndexer(inputCol="path", outputCol="path_index")
+
+    assembler = VectorAssembler(
+        # inputCols=["path_index", "response_time_ms"],
+        # 시간대 패턴 반영
+        inputCols=["path_index", "response_time_ms", "hour"],
+        outputCol="features_raw"
+    )
+
+    scaler = StandardScaler(
+        inputCol="features_raw",
+        outputCol="features",
+        withMean=True,
+        withStd=True
+    )
+
+    # lr = LogisticRegression(featuresCol="features", labelCol="label")
+    lr = LogisticRegression(
+        featuresCol="features",
+        labelCol="label",
+        threshold=0.3,  # 민감도 조정 - 오류 예측을 더 적극적으로 수행
+    )
+    
+    pipeline = Pipeline(stages=[indexer, assembler, scaler, lr])
+
+    model = pipeline.fit(train_df)
+    predictions = model.transform(test_df)
+
+    evaluator = BinaryClassificationEvaluator(labelCol="label", metricName="areaUnderROC")
+    auc = evaluator.evaluate(predictions)
+
+    total = predictions.count()
+    correct = predictions.filter(F.col("label") == F.col("prediction")).count()
+    false_negatives = predictions.filter(
+        (F.col("label") == 1.0) & (F.col("prediction") == 0.0)
+    ).count()
+
+    samples = [
+        row.asDict()
+        for row in predictions.select("path", "status_code", "response_time_ms", "label", "prediction")
+        .limit(10)
+        .collect()
+    ]
+
+    return {
+        # "auc": round(auc, 4),
+        # "samples": samples,
+        "auc": round(auc, 4),
+        "accuracy": round(correct / total, 4),
+        "false_negatives": false_negatives,
+        "samples": samples,
+    }
