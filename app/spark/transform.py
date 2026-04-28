@@ -4,7 +4,7 @@ from pyspark.sql.types import StringType
 from pyspark.ml.feature import VectorAssembler, StandardScaler, StringIndexer
 from pyspark.ml import Pipeline
 from pyspark.ml.clustering import KMeans
-from pyspark.ml.classification import LogisticRegression
+from pyspark.ml.classification import LogisticRegression, GBTClassifier
 from pyspark.ml.evaluation import BinaryClassificationEvaluator
 
 def prepare_web_logs(df: DataFrame) -> DataFrame:
@@ -14,12 +14,14 @@ def prepare_web_logs(df: DataFrame) -> DataFrame:
             .withColumn("response_time_ms", F.col("response_time_ms").cast("int"))
     )
 
+
 def count_requests_by_path(df: DataFrame) -> DataFrame:
     return (
         df.groupBy("path")
             .count()
             .orderBy(F.desc("count"))
     )
+
 
 def count_requests_by_status_code(df: DataFrame) -> DataFrame:
     return (
@@ -28,10 +30,12 @@ def count_requests_by_status_code(df: DataFrame) -> DataFrame:
             .orderBy(F.desc("count"))
     )
 
+
 def calculate_average_response_time(df: DataFrame) -> DataFrame:
     return df.select(
         F.avg("response_time_ms").alias("average_response_time_ms")
     )
+
 
 def calculate_error_rate(df: DataFrame) -> DataFrame:
     return df.select(
@@ -41,12 +45,14 @@ def calculate_error_rate(df: DataFrame) -> DataFrame:
         ).alias("error_rate")
     )
 
+
 def count_requests_by_method(df: DataFrame) -> DataFrame:
     return (
         df.groupBy("method")
             .count()
             .orderBy(F.desc("count"))
     )
+
 
 def rank_paths_by_response_time(df: DataFrame) -> DataFrame:
     window_spec = Window.partitionBy("path").orderBy(F.desc("response_time_ms"))
@@ -55,6 +61,7 @@ def rank_paths_by_response_time(df: DataFrame) -> DataFrame:
         .select("path", "response_time_ms", "rank")
         .orderBy("path", "rank")
     )
+
 
 def moving_average_response_time(df: DataFrame) -> DataFrame:
     window_spec = Window.orderBy("timestamp").rowsBetween(-2, 0)
@@ -67,6 +74,7 @@ def moving_average_response_time(df: DataFrame) -> DataFrame:
         .orderBy("timestamp")
     )
 
+
 def classify_response_time(response_time_ms):
     if response_time_ms <= 50:
         return "빠름"
@@ -75,10 +83,12 @@ def classify_response_time(response_time_ms):
     else:
         return "느림"
     
+    
 classify_response_time_udf = F.udf(classify_response_time, StringType())
 
 def add_response_time_grade(df: DataFrame) -> DataFrame:
     return df.withColumn("grade", classify_response_time_udf(F.col("response_time_ms")))
+
 
 def count_requests_by_grade(df: DataFrame) -> DataFrame:
     return (
@@ -86,6 +96,7 @@ def count_requests_by_grade(df: DataFrame) -> DataFrame:
             .count()
             .orderBy(F.desc("count"))
     )
+
 
 def save_partitioned(df: DataFrame, output_path: str, partition_by: str) -> None:
     (
@@ -95,12 +106,14 @@ def save_partitioned(df: DataFrame, output_path: str, partition_by: str) -> None
             .parquet(output_path)
     )
 
+
 def read_partitioned(spark: SparkSession, input_path: str, filter_col: str, filter_val) -> DataFrame:
     return (
         spark.read
             .parquet(input_path)
             .filter(F.col(filter_col) == filter_val)
     )
+
 
 def run_kmeans_clustering(df: DataFrame, k: int) -> DataFrame:
     indexer = StringIndexer(inputCol="path", outputCol="path_index")
@@ -125,6 +138,7 @@ def run_kmeans_clustering(df: DataFrame, k: int) -> DataFrame:
 
     return model.transform(df).select("path", "status_code", "response_time_ms", "cluster")
 
+
 def summarize_clusters(df: DataFrame) -> DataFrame:
     return (
         df.groupBy("cluster")
@@ -137,11 +151,13 @@ def summarize_clusters(df: DataFrame) -> DataFrame:
             .orderBy("cluster")
     )
 
+
 def prepare_classification_features(df: DataFrame) -> DataFrame:
     return df.withColumn(
         "label",
         F.when(F.col("status_code") >= 400, 1.0).otherwise(0.0)
     )
+
 
 def run_logistic_regression(df: DataFrame) -> dict:
     df_labeled = prepare_classification_features(df)
@@ -184,6 +200,7 @@ def run_logistic_regression(df: DataFrame) -> dict:
         "auc": round(auc, 4),
         "samples": samples,
     }
+
 
 def run_logistic_regression_improved(df: DataFrame) -> dict:
     df_labeled = prepare_classification_features(df)
@@ -242,6 +259,123 @@ def run_logistic_regression_improved(df: DataFrame) -> dict:
         # "samples": samples,
         "auc": round(auc, 4),
         "accuracy": round(correct / total, 4),
+        "false_negatives": false_negatives,
+        "samples": samples,
+    }
+
+
+def run_logistic_regression_weighted(df: DataFrame) -> dict:
+    df_labeled = prepare_classification_features(df)
+
+    error_count = df_labeled.filter(F.col("label") == 1.0).count()
+    normal_count = df_labeled.filter(F.col("label") == 0.0).count()
+    total = error_count + normal_count
+
+    df_weighted = df_labeled.withColumn(
+        "weight",
+        F.when(F.col("label") == 1.0, total / (2 * error_count))
+        .otherwise(total / (2 * normal_count))
+    )
+
+    train_df, test_df = df_weighted.randomSplit([0.8, 0.2], seed=42)
+
+    indexer = StringIndexer(inputCol="path", outputCol="path_index")
+
+    assembler = VectorAssembler(
+        inputCols=["path_index", "response_time_ms"],
+        outputCol="features_raw"
+    )
+
+    scaler = StandardScaler(
+        inputCol="features_raw",
+        outputCol="features",
+        withMean=True,
+        withStd=True
+    )
+
+    lr = LogisticRegression(
+        featuresCol="features",
+        labelCol="label",
+        weightCol="weight"
+    )
+
+    pipeline = Pipeline(stages=[indexer, assembler, scaler, lr])
+    model = pipeline.fit(train_df)
+    predictions = model.transform(test_df)
+
+    evaluator = BinaryClassificationEvaluator(labelCol="label", metricName="areaUnderROC")
+    auc = evaluator.evaluate(predictions)
+
+    total_test = predictions.count()
+    correct = predictions.filter(F.col("label") == F.col("prediction")).count()
+    false_negatives = predictions.filter(
+        (F.col("label") == 1.0) & (F.col("prediction") == 0.0)
+    ).count()
+
+    samples = [
+        row.asDict()
+        for row in predictions.select("path", "status_code", "response_time_ms", "label", "prediction")
+        .limit(10)
+        .collect()
+    ]
+
+    return {
+        "auc": round(auc, 4),
+        "accuracy": round(correct / total_test, 4),
+        "false_negatives": false_negatives,
+        "samples": samples,
+    }
+
+
+def run_gbt(df: DataFrame) -> dict:
+    df_labeled = prepare_classification_features(df)
+
+    train_df, test_df = df_labeled.randomSplit([0.8, 0.2], seed=42)
+
+    indexer = StringIndexer(inputCol="path", outputCol="path_index")
+
+    assembler = VectorAssembler(
+        inputCols=["path_index", "response_time_ms"],
+        outputCol="features_raw"
+    )
+
+    scaler = StandardScaler(
+        inputCol="features_raw",
+        outputCol="features",
+        withMean=True,
+        withStd=True
+    )
+
+    gbt = GBTClassifier(
+        featuresCol="features",
+        labelCol="label",
+        maxIter=20,
+        seed=42
+    )
+
+    pipeline = Pipeline(stages=[indexer, assembler, scaler, gbt])
+    model = pipeline.fit(train_df)
+    predictions = model.transform(test_df)
+
+    evaluator = BinaryClassificationEvaluator(labelCol="label", metricName="areaUnderROC")
+    auc = evaluator.evaluate(predictions)
+
+    total_test = predictions.count()
+    correct = predictions.filter(F.col("label") == F.col("prediction")).count()
+    false_negatives = predictions.filter(
+        (F.col("label") == 1.0) & (F.col("prediction") == 0.0)
+    ).count()
+
+    samples = [
+        row.asDict()
+        for row in predictions.select("path", "status_code", "response_time_ms", "label", "prediction")
+        .limit(10)
+        .collect()
+    ]
+
+    return {
+        "auc": round(auc, 4),
+        "accuracy": round(correct / total_test, 4),
         "false_negatives": false_negatives,
         "samples": samples,
     }

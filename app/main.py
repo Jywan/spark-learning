@@ -5,18 +5,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 
-from app.services.analytic import (
-    get_web_log_analytics, 
-    get_request_log_analytics, 
-    get_web_log_analytics_sql, 
-    get_web_log_window_analytics, 
-    get_web_log_analytics_cached,
-    get_web_log_udf_analytics,
-    get_web_log_partition_analytics,
-    get_web_log_kmeans_analytics,
-    get_web_log_lr_analytics,
-    get_web_log_lr_improved_analytics,
-)
+from app.services.analytic import *
 
 REQUEST_LOG_CSV_PATH = Path("data/request_logs.csv")
 REQUEST_LOG_FIELDNAMES = ["timestamp", "method", "path", "status_code", "response_time_ms"]
@@ -99,10 +88,22 @@ def read_web_log_partition_analytics() -> dict:
 def read_web_log_kmeans_analytics() -> dict:
     return get_web_log_kmeans_analytics()
 
+
 @app.get("/analytics/web-logs-lr")
 def read_web_log_lr_analytics() -> dict:
     return get_web_log_lr_analytics()
 
+
 @app.get("/analytics/web-logs-lr-improved")
 def read_web_log_lr_improved_analytics() -> dict:
     return get_web_log_lr_improved_analytics()
+
+
+@app.get("/analytics/web-logs-lr-weighted")
+def read_web_log_lr_weighted_analytics() -> dict:
+    return get_web_log_lr_weighted_analytics()
+
+
+@app.get("/analytics/web-logs-gbt")
+def read_web_log_gbt_analytics() -> dict:
+    return get_web_log_gbt_analytics()

@@ -13,3 +13,6 @@ timestamp,method,path,status_code,response_time_ms
 2026-04-28T11:44:34,GET,/analytics/web-logs-kmeans,200,6600
 2026-04-28T13:38:35,GET,/analytics/web-logs-lr,200,7290
 2026-04-28T13:56:29,GET,/analytics/web-logs-lr-improved,200,8523
+2026-04-28T14:31:36,GET,/analytics/web-logs-lr-ml,200,7252
+2026-04-28T15:56:33,GET,/analytics/web-logs-lr-weighted,200,7884
+2026-04-28T15:56:40,GET,/analytics/web-logs-gbt,200,4649

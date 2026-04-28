@@ -1,28 +1,6 @@
 from app.spark.session import get_spark_session
-from app.spark.transform import (
-    calculate_average_response_time,
-    calculate_error_rate,
-    count_requests_by_path,
-    count_requests_by_status_code,
-    count_requests_by_method,
-    prepare_web_logs,
-    rank_paths_by_response_time,
-    moving_average_response_time,
-    add_response_time_grade,
-    count_requests_by_grade,
-    save_partitioned,
-    read_partitioned,
-    run_kmeans_clustering,
-    summarize_clusters,
-    run_logistic_regression,
-    run_logistic_regression_improved,
-)
-from app.spark.transform_sql import (
-    calculate_average_response_time_sql,
-    calculate_error_rate_sql,
-    count_requests_by_path_sql,
-    count_requests_by_status_code_sql,
-)
+from app.spark.transform import *
+from app.spark.transform_sql import *
 
 WEB_LOGS_CSV_PATH = "data/web_logs.csv"
 PARTITION_PATH = "data/web_logs_partitioned"
@@ -284,3 +262,19 @@ def get_web_log_lr_improved_analytics() -> dict:
         "before": before,
         "after": after,
     }
+
+def get_web_log_lr_weighted_analytics() -> dict:
+    spark = get_spark_session()
+    
+    raw_df = spark.read.option("header", "true").csv(WEB_LOGS_CSV_PATH)
+    logs_df = prepare_web_logs(raw_df)
+
+    return run_logistic_regression_weighted(logs_df)
+
+def get_web_log_gbt_analytics() -> dict:
+    spark = get_spark_session()
+
+    raw_df = spark.read.option("header", "true").csv(WEB_LOGS_CSV_PATH)
+    logs_df = prepare_web_logs(raw_df)
+
+    return run_gbt(logs_df)
