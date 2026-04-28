@@ -1,6 +1,9 @@
 from pyspark.sql import DataFrame, Window, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import StringType
+from pyspark.ml.feature import VectorAssembler, StandardScaler, StringIndexer
+from pyspark.ml import Pipeline
+from pyspark.ml.clustering import KMeans
 
 def prepare_web_logs(df: DataFrame) -> DataFrame:
     return (
@@ -95,4 +98,39 @@ def read_partitioned(spark: SparkSession, input_path: str, filter_col: str, filt
         spark.read
             .parquet(input_path)
             .filter(F.col(filter_col) == filter_val)
+    )
+
+def run_kmeans_clustering(df: DataFrame, k: int) -> DataFrame:
+    indexer = StringIndexer(inputCol="path", outputCol="path_index")
+
+    assembler = VectorAssembler(
+        inputCols=["path_index", "status_code", "response_time_ms"],
+        outputCol="features_raw"
+    )
+
+    scaler = StandardScaler(
+        inputCol="features_raw",
+        outputCol="features",
+        withMean=True,
+        withStd=True
+    )
+
+    kmeans = KMeans(featuresCol="features", predictionCol="cluster", k=k, seed=42)
+
+    pipeline = Pipeline(stages=[indexer, assembler, scaler, kmeans])
+
+    model = pipeline.fit(df)
+
+    return model.transform(df).select("path", "status_code", "response_time_ms", "cluster")
+
+def summarize_clusters(df: DataFrame) -> DataFrame:
+    return (
+        df.groupBy("cluster")
+            .agg(
+                F.count("*").alias("count"),
+                F.avg("response_time_ms").alias("avg_response_time_ms"),
+                F.max("response_time_ms").alias("max_response_time_ms"),
+                F.min("response_time_ms").alias("min_response_time_ms"),
+            )
+            .orderBy("cluster")
     )

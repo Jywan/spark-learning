@@ -12,6 +12,8 @@ from app.spark.transform import (
     count_requests_by_grade,
     save_partitioned,
     read_partitioned,
+    run_kmeans_clustering,
+    summarize_clusters,
 )
 from app.spark.transform_sql import (
     calculate_average_response_time_sql,
@@ -238,4 +240,24 @@ def get_web_log_partition_analytics() -> dict:
     return {
         "full_read": {"count": full_count, "elapsed_ms": elapsed_full_ms},
         "partition_read": {"status_code": 200, "count": partition_count, "elapsed_ms": elapsed_partition_ms},
+    }
+
+def get_web_log_kmeans_analytics() -> dict:
+    spark = get_spark_session()
+
+    raw_df = spark.read.option("header", "true").csv(WEB_LOGS_CSV_PATH)
+    logs_df = prepare_web_logs(raw_df)
+
+    clustered_df = run_kmeans_clustering(logs_df, k=3)
+    summary_df = summarize_clusters(clustered_df)
+
+    cluster_summary = [row.asDict() for row in summary_df.collect()]
+    samples = [
+        row.asDict()
+        for row in clustered_df.orderBy("cluster").limit(10).collect()
+    ]
+
+    return {
+        "cluster_summary": cluster_summary,
+        "samples": samples,
     }
