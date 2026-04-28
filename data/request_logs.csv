@@ -11,3 +11,4 @@ timestamp,method,path,status_code,response_time_ms
 2026-04-28T10:03:09,GET,/analytics/web-logs-udf,200,4668
 2026-04-28T10:29:35,GET,/analytics/web-logs-partition,200,4564
 2026-04-28T11:44:34,GET,/analytics/web-logs-kmeans,200,6600
+2026-04-28T13:38:35,GET,/analytics/web-logs-lr,200,7290

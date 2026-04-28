@@ -14,6 +14,7 @@ from app.spark.transform import (
     read_partitioned,
     run_kmeans_clustering,
     summarize_clusters,
+    run_logistic_regression,
 )
 from app.spark.transform_sql import (
     calculate_average_response_time_sql,
@@ -261,3 +262,11 @@ def get_web_log_kmeans_analytics() -> dict:
         "cluster_summary": cluster_summary,
         "samples": samples,
     }
+
+def get_web_log_lr_analytics() -> dict:
+    spark = get_spark_session()
+
+    raw_df = spark.read.option("header", "true").csv(WEB_LOGS_CSV_PATH)
+    logs_df = prepare_web_logs(raw_df)
+
+    return run_logistic_regression(logs_df)

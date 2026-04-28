@@ -4,6 +4,8 @@ from pyspark.sql.types import StringType
 from pyspark.ml.feature import VectorAssembler, StandardScaler, StringIndexer
 from pyspark.ml import Pipeline
 from pyspark.ml.clustering import KMeans
+from pyspark.ml.classification import LogisticRegression
+from pyspark.ml.evaluation import BinaryClassificationEvaluator
 
 def prepare_web_logs(df: DataFrame) -> DataFrame:
     return (
@@ -134,3 +136,51 @@ def summarize_clusters(df: DataFrame) -> DataFrame:
             )
             .orderBy("cluster")
     )
+
+def prepare_classification_features(df: DataFrame) -> DataFrame:
+    return df.withColumn(
+        "label",
+        F.when(F.col("status_code") >= 400, 1.0).otherwise(0.0)
+    )
+
+def run_logistic_regression(df: DataFrame) -> dict:
+    df_labeled = prepare_classification_features(df)
+
+    train_df, test_df = df_labeled.randomSplit([0.8, 0.2], seed=42)
+
+    indexer = StringIndexer(inputCol="path", outputCol="path_index")
+
+    assembler = VectorAssembler(
+        inputCols=["path_index", "response_time_ms"],
+        outputCol="features_raw"
+    )
+
+    scaler = StandardScaler(
+        inputCol="features_raw",
+        outputCol="features",
+        withMean=True,
+        withStd=True
+    )
+
+    lr = LogisticRegression(featuresCol="features", labelCol="label")
+    
+    pipeline = Pipeline(stages=[indexer, assembler, scaler, lr])
+
+    model = pipeline.fit(train_df)
+
+    predictions = model.transform(test_df)
+
+    evaluator = BinaryClassificationEvaluator(labelCol="label", metricName="areaUnderROC")
+    auc = evaluator.evaluate(predictions)
+
+    samples = [
+        row.asDict()
+        for row in predictions.select("path", "status_code", "response_time_ms", "label", "prediction")
+        .limit(10)
+        .collect()
+    ]
+
+    return {
+        "auc": round(auc, 4),
+        "samples": samples,
+    }
