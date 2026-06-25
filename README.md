@@ -81,4 +81,4 @@ python -m uvicorn app.main:app --reload
 
 ## 블로그
 
-[Spark 학습 프로젝트 시리즈]([https://j-y-w.tistory.com/category/spark%20%ED%95%99%EC%8A%B5%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8])
+[Spark 학습 프로젝트 시리즈]((https://j-y-w.tistory.com/category/spark%20%ED%95%99%EC%8A%B5%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8))
